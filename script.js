@@ -1,15 +1,4 @@
- <!-- Firebase SDK - musí být PŘED audioFirebaseFunctions.js -->
-<script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-firestore-compat.js"></script>
 
-    
-      <!-- ZDE NAČTEŠ SVŮJ NOVÝ SOUBOR S PLAYLISTEM -->
-    <script src="myPlaylist.js"></script> 
-    <!-- Teprve potom tvůj soubor -->
-<script src="audioFirebaseFunctions.js"></script>
-<script>
-
- 
 // --- Globální proměnné a konstanty ---
 const audioPlayer = document.getElementById('audioPlayer');
 const audioSource = document.getElementById('audioSource');
