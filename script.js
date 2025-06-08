@@ -1,3 +1,15 @@
+ <!-- Firebase SDK - musí být PŘED audioFirebaseFunctions.js -->
+<script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-firestore-compat.js"></script>
+
+    
+      <!-- ZDE NAČTEŠ SVŮJ NOVÝ SOUBOR S PLAYLISTEM -->
+    <script src="myPlaylist.js"></script> 
+    <!-- Teprve potom tvůj soubor -->
+<script src="audioFirebaseFunctions.js"></script>
+<script>
+
+ 
 // --- Globální proměnné a konstanty ---
 const audioPlayer = document.getElementById('audioPlayer');
 const audioSource = document.getElementById('audioSource');
@@ -27,24 +39,24 @@ const clockSeconds = document.querySelector('.time .seconds');
 const currentDateElement = document.getElementById('currentDate');
 const favoritesButton = document.createElement('button'); // Vytvoření tlačítka pro oblíbené
 
+// Globální proměnné pro stav přehrávače a data (inicializovány jako prázdné/výchozí, budou načteny)
 let currentTrackIndex = 0;
 let isShuffled = false;
 let shuffledIndices = [];
-let favorites = JSON.parse(localStorage.getItem('favorites') || '[]');
-let originalTracks = []; 
+let favorites = []; // Bude inicializováno z úložiště
+let originalTracks = []; // Bude inicializováno z úložiště
 let currentPlaylist = []; 
 
-// --- Seznam skladeb ---
-// Předpokládáme, že `window.tracks` je definováno globálně v HTML před tímto skriptem.
-if (typeof window.tracks === 'undefined') {
-    console.warn("Globální proměnná 'tracks' není definována. Používám prázdný playlist.");
-    window.tracks = [];
-}
-originalTracks = [...window.tracks]; 
-currentPlaylist = [...originalTracks]; 
- // Seznam skladeb - zde přidejte své vlastní skladby
-  window.tracks =  tracks = [
-  { src: 'https://www.dropbox.com/scl/fi/x0z9ddkz3zfqrvcnb6nr8/Odysea-Kapit-na-Ar-era-1.mp3?rlkey=mlav41qi6qe5ukss3q4qdd8f6&st=44y26ef2&dl=1', title: 'Odysea-Kapitána-Arčra' },
+// --- Seznam skladeb (TVŮJ HLAVNÍ HARDCODED PLAYLIST) ---
+// Tuto proměnnou NEMĚNÍM. Bude sloužit jako konečný fallback, pokud se nic nenačte z Firebase/LocalStorage.
+// Předpokládáme, že `window.tracks` je definováno globálně v HTML PŘED TÍMTO skriptem.
+// Pokud není definováno globálně nebo není pole, zde se vytvoří prázdné pole, které bude použito jako ultimate fallback.
+if (typeof window.tracks === 'undefined' || !Array.isArray(window.tracks)) {
+    //console.warn("audioPlayer.js: Globální proměnná 'window.tracks' není definována nebo není pole. Používám prázdný playlist jako základ.");
+    // Důležité: Pokud window.tracks neexistuje, vytvoříme ho s jednou výchozí skladbou
+    // aby se přehrávač nespustil prázdný při prvním načtení bez dat z cloudu.
+    window.tracks = [
+     { src: 'https://www.dropbox.com/scl/fi/x0z9ddkz3zfqrvcnb6nr8/Odysea-Kapit-na-Ar-era-1.mp3?rlkey=mlav41qi6qe5ukss3q4qdd8f6&st=44y26ef2&dl=1', title: 'Odysea-Kapitána-Arčra' },
 { src: 'https://www.dropbox.com/scl/fi/hl4pp862wvlgd3kj2uixj/Hv-zdn-lo-sn.mp3?rlkey=uxfr6emv2h70v9blgmoily2ug&st=h40ynmje&dl=1', title: 'Hvězdná-Loď-snů' },
 { src: 'https://www.dropbox.com/scl/fi/w6jjzo8avh3rnd70gyva6/Stanice-Hlubok-Vesm-r-9.mp3?rlkey=sy23k7qogrbott7gmj5q7db2v&st=lcr4ygmh&dl=1', title: 'Stanice-Hluboký-Vesmír-9' },
            
@@ -454,15 +466,65 @@ currentPlaylist = [...originalTracks];
   { src: 'https://www.dropbox.com/scl/fi/72qzvodhbmpu1b3wxjfqu/star-trek-p-sni-ka-o-pos-dk-ch-Remastered-v.1.mp3?rlkey=2x27co9jw7fvaz2udrv12fuvv&st=7yo7ciqq&dl=1', title: 'star trek písnička o posádkách (Rema) v.1' },
   { src: 'https://www.dropbox.com/scl/fi/qsqqowxnjft0rgdobp0a2/star-trek-p-sni-ka-o-pos-dk-ch-Remastered-v.2.mp3?rlkey=2qqv6jc6jvpzxtq3ykfo0qk0g&st=17fwhkyw&dl=1', title: 'star trek písnička o posádkách (Rema) v.2' },
   { src: 'https://www.dropbox.com/scl/fi/kc874ru80o269o2i4e941/U-nejsem-tv-hra-ka-Remastered-v.1.mp3?rlkey=t1gxhizzv566wvc0hoajt3ad0&st=v0hr287t&dl=1', title: 'Už nejsem tvá hračka (Rema) v.1' },
-  { src: 'https://www.dropbox.com/scl/fi/8an781xkw0u16q93xtloi/U-nejsem-tv-hra-ka-Remastered-v.2.mp3?rlkey=j8csjilyc34dui3xewuvbqwcg&st=kbrnxsh2&dl=1', title: 'Už nejsem tvá hračka (Rema) v.2' },
-  ];
+  { src: 'https://www.dropbox.com/scl/fi/8an781xkw0u16q93xtloi/U-nejsem-tv-hra-ka-Remastered-v.2.mp3?rlkey=j8csjilyc34dui3xewuvbqwcg&st=kbrnxsh2&dl=1', title: 'Už nejsem tvá hračka (Rema) v.2' } ,
 
-// --- Funkce ---
 
+ 
+{ src: 'https://www.dropbox.com/scl/fi/umjyrkl3cxfm6majipbsl/mix-p-sni-ek-v.1.mp3?rlkey=zysejafc9fxbokz0pn8pep93w&st=s0pp6qup&dl=1', title: 'mix písniček v.1' },
+{ src: 'adresa2', title: 'https://www.dropbox.com/scl/fi/qgzcg0tiugq2eu39jbelt/mix-p-sni-ek-v.2.mp3?rlkey=l7q0yvnb0wwasy8l3lbtlmdul&st=mhusriun&dl=1' },
+{ src: 'https://www.dropbox.com/scl/fi/e8ixuz03io5rs078i4t2a/mix-p-sni-ek-v.3.mp3?rlkey=u6x614g67thnyn8r5782yyu99&st=5ou0v1rt&dl=1', title: 'mix písniček v.3' },
+{ src: 'https://www.dropbox.com/scl/fi/2gjdeaxxxoce5uqcal5tf/mix-p-sni-ek-v.4.mp3?rlkey=0y9zcm985mxz6hosbqufmkezm&st=2ww2ralg&dl=1', title: 'mix písniček v.4' },
+{ src: 'https://www.dropbox.com/scl/fi/sjhs5uj26d8nhzcte42uo/mix-p-sni-ek-v.5.mp3?rlkey=fiqw8vnrmkxcwh52bjuthywst&st=w3s64nld&dl=1', title: 'mix písniček v.5' },
+{ src: 'https://www.dropbox.com/scl/fi/s77rmj77jgon0jnwi8a1o/mix-p-sni-ek-v.6.mp3?rlkey=vci7p38jci9g5lt2c7ybyu338&st=wppjnwcj&dl=1', title: 'mix písniček v.6' },
+{ src: 'https://www.dropbox.com/scl/fi/2ymgare8f3h9n3ckmtpm6/mix-p-sni-ek-v.7.mp3?rlkey=xerq5noy73m5i8xzo44wxcmnf&st=ltbu3su8&dl=1', title: 'mix písniček v.7' },
+{ src: 'https://www.dropbox.com/scl/fi/fqvao7naonsv3q7z4vhv6/mix-p-sni-ek-v.8.mp3?rlkey=0o5bnw1tppgfqmtwh60a7nrhs&st=61cz4rlk&dl=1', title: 'mix písniček v.8' },
+{ src: 'https://www.dropbox.com/scl/fi/mbi16rerzufv9rg2gqcbd/mix-p-sni-ek-v.9.mp3?rlkey=h2sigdbmealjjiii1ak540a7k&st=0k8rmizq&dl=1', title: 'mix písniček v.9' },
+{ src: 'https://www.dropbox.com/scl/fi/6oj3b0snsrdol0oqq5838/mix-p-sni-ek-v.10.mp3?rlkey=1bukogfm3vkt5dx964falth8k&st=287lbbr0&dl=1', title: 'mix písniček v.10' },
+{ src: 'https://www.dropbox.com/scl/fi/nobtr5d5n668hwarg3dfy/Stanice-Hlubok-Vesm-r-9-v.1.mp3?rlkey=luusv44k8h64sobcbikvmmj6n&st=1xcgruhu&dl=1', title: 'Stanice Hluboký Vesmír 9 v.1' },
+{ src: 'https://www.dropbox.com/scl/fi/4frwnueluwgxjli4wgzwf/Stanice-Hlubok-Vesm-r-9-v.2.mp3?rlkey=qdks27ngdm4tsg0ftvp6i3qj4&st=djyjw0e7&dl=1', title: 'Stanice Hluboký Vesmír 9 v.2' },
+{ src: 'https://www.dropbox.com/scl/fi/f8tl52roikxphuuhb31zq/Stanice-Hlubok-Vesm-r-9-v.3.mp3?rlkey=s2x4f9yuo3ftirxa38c77waq6&st=v4p7bqz6&dl=1', title: 'Stanice Hluboký Vesmír 9 v.3' },
+{ src: 'https://www.dropbox.com/scl/fi/2adsvy3vuqstipnik29b0/Stanice-Hlubok-Vesm-r-9-v.4.mp3?rlkey=rlr4ulc69i91pmsmze4jslqsa&st=q1pqrhu6&dl=1', title: 'Stanice Hluboký Vesmír 9 v.4' },
+{ src: 'https://www.dropbox.com/scl/fi/ieooxhpy1eeg8cghmxvdq/Stanice-Hlubok-Vesm-r-9-v.5.mp3?rlkey=76wbsfknainfdo93lv6wnw93x&st=0oc532vw&dl=1', title: 'Stanice Hluboký Vesmír 9 v.5' },
+{ src: 'https://www.dropbox.com/scl/fi/kip18cbu2jg5qicn9vham/Stanice-Hlubok-Vesm-r-9-v.6.mp3?rlkey=neryuhl8l2mwd0zlxpsszuova&st=0siz1ckk&dl=1', title: 'Stanice Hluboký Vesmír 9 v.6' },
+{ src: 'https://www.dropbox.com/scl/fi/z7111ptturevnr7v93dol/Stanice-Hlubok-Vesm-r-9-v.7.mp3?rlkey=1aquiq1uv62svyub0526igap0&st=hdpo5exf&dl=1', title: 'Stanice Hluboký Vesmír 9 v.7' },
+{ src: 'https://www.dropbox.com/scl/fi/ywfpdorl779fxlmsnc0ah/Stanice-Hlubok-Vesm-r-9-v.8.mp3?rlkey=429k9n0ygjthsl87mxsgg9t54&st=paxi078b&dl=1', title: 'Stanice Hluboký Vesmír 9 v.8' },
+{ src: 'https://www.dropbox.com/scl/fi/496nylozhgsn9arbvocwa/V-ichni-chod-do-st-edn-koly-v.1.mp3?rlkey=gl5wpamhlxga4s5kso765humq&st=ut2jpjr4&dl=1', title: 'Všichni chodí do střední školy v.1' },
+{ src: 'https://www.dropbox.com/scl/fi/wd0aoiwm1z5zbim7ycq0x/V-ichni-chod-do-st-edn-koly-v.2.mp3?rlkey=d3h81wcta3mrx3xr22ovnr7x9&st=nn6pzmih&dl=1', title: 'Všichni chodí do střední školy v.2' },
+    ];
+}
+
+
+// --- Chybějící funkce showNotification (přidáno zde) ---
+// Tato funkce je volána z firebaseFunctions.js a dalších míst
+window.showNotification = function(message, type = 'info', duration = 3000) {
+    console.log(`[${type.toUpperCase()}] ${message}`);
+    const notificationElement = document.getElementById('notification'); // Předpokládáme, že element #notification existuje v HTML
+    if (notificationElement) {
+        notificationElement.textContent = message;
+        notificationElement.style.display = 'block';
+        // Nastavení barvy na základě typu (volitelné, pokud máš CSS styly pro .notification.error atd.)
+        if (type === 'error') {
+            notificationElement.style.backgroundColor = '#dc3545'; // Červená pro chybu
+        } else if (type === 'warn') {
+            notificationElement.style.backgroundColor = '#ffc107'; // Žlutá pro varování
+        } else {
+            notificationElement.style.backgroundColor = '#28a745'; // Zelená pro info/úspěch
+        }
+        setTimeout(() => {
+            notificationElement.style.display = 'none';
+        }, duration);
+    } else {
+        // Fallback, pokud není element pro notifikace (jen do konzole)
+        console.warn(`showNotification: Upozornění UI elementu #notification nebyl nalezen. Zpráva: ${message}`);
+    }
+};
+
+
+// --- Funkce pro čištění a aktualizaci URL adres ---
 function checkAndFixTracks(trackList) {
     let fixedUrls = 0;
     if (!Array.isArray(trackList)) {
-        console.error("❌ Chyba: Seznam skladeb není pole.");
+        console.error("checkAndFixTracks: Seznam skladeb není pole.");
         return;
     }
     trackList.forEach(track => {
@@ -472,11 +534,218 @@ function checkAndFixTracks(trackList) {
         }
     });
     if (fixedUrls > 0) {
-        console.log(`✅ Opraveno ${fixedUrls} URL adres v playlistu.`);
+        console.log(`checkAndFixTracks: ✅ Opraveno ${fixedUrls} URL adres v playlistu (Dropbox dl=0 na dl=1).`);
     }
 }
-checkAndFixTracks(originalTracks); 
 
+// --- Hlavní funkce pro načítání a ukládání všech dat přehrávače ---
+
+// Tato funkce načte VŠECHNA data (playlist, oblíbené, nastavení přehrávače)
+// s prioritou: Firebase Firestore -> LocalStorage -> window.tracks (tvůj hardcoded playlist)
+async function loadAudioData() {
+    console.log("loadAudioData: Spuštěno načítání dat pro audio přehrávač.");
+
+    // 1. Inicializujeme s hardcoded playlistem z window.tracks (tvůj základní seznam)
+    originalTracks = [...window.tracks]; 
+    currentPlaylist = [...originalTracks];
+    console.log(`loadAudioData: Inicializováno z window.tracks (délka: ${originalTracks.length}).`);
+
+    let firestorePlaylistLoaded = false;
+    let firestoreFavoritesLoaded = false;
+    let firestorePlayerSettingsLoaded = false;
+
+    // 2. Pokus o načtení z Firebase Firestore (přepíše lokální data, pokud existují)
+    try {
+        console.log("loadAudioData: Pokouším se načíst playlist z Firestore.");
+        const loadedFirestorePlaylist = await window.loadPlaylistFromFirestore();
+        if (loadedFirestorePlaylist && loadedFirestorePlaylist.length > 0) {
+            window.tracks = loadedFirestorePlaylist; // PŘEPISUJEME PŘÍMO window.tracks
+            firestorePlaylistLoaded = true;
+            checkAndFixTracks(window.tracks); // Opravíme URL po načtení z Firestore
+            console.log("loadAudioData: Playlist načten z Firestore.");
+        } else {
+            console.log("loadAudioData: Žádný playlist ve Firestore.");
+        }
+
+        console.log("loadAudioData: Pokouším se načíst oblíbené z Firestore.");
+        const loadedFirestoreFavorites = await window.loadFavoritesFromFirestore();
+        if (loadedFirestoreFavorites && loadedFirestoreFavorites.length > 0) {
+            favorites = [...loadedFirestoreFavorites]; // Favorites je stále samostatné pole
+            firestoreFavoritesLoaded = true;
+            console.log("loadAudioData: Oblíbené načteny z Firestore.");
+        } else {
+            console.log("loadAudioData: Žádné oblíbené ve Firestore.");
+        }
+
+        console.log("loadAudioData: Pokouším se načíst nastavení přehrávače z Firestore.");
+        const loadedFirestorePlayerSettings = await window.loadPlayerSettingsFromFirestore();
+        if (loadedFirestorePlayerSettings) {
+            // Aplikujeme načtená nastavení
+            if (loadedFirestorePlayerSettings.isShuffled !== undefined) isShuffled = loadedFirestorePlayerSettings.isShuffled;
+            if (loadedFirestorePlayerSettings.loop !== undefined && audioPlayer) audioPlayer.loop = loadedFirestorePlayerSettings.loop;
+            if (loadedFirestorePlayerSettings.currentTrackIndex !== undefined) currentTrackIndex = loadedFirestorePlayerSettings.currentTrackIndex;
+            if (loadedFirestorePlayerSettings.volume !== undefined && audioPlayer) audioPlayer.volume = loadedFirestorePlayerSettings.volume; 
+            if (loadedFirestorePlayerSettings.muted !== undefined && audioPlayer) audioPlayer.muted = loadedFirestorePlayerSettings.muted; 
+            
+            firestorePlayerSettingsLoaded = true;
+            console.log("loadAudioData: Nastavení přehrávače načteno z Firestore.");
+        } else {
+            console.log("loadAudioData: Žádné nastavení přehrávače ve Firestore.");
+        }
+
+    } catch (error) {
+        console.error("loadAudioData: Chyba při načítání dat z Firebase Firestore:", error);
+        window.showNotification("Chyba při načítání dat z cloudu. Používám lokální data.", 'error'); 
+    }
+
+    // 3. Fallback na LocalStorage (pokud Firestore nic nenačetl, a přepíše window.tracks data)
+    if (!firestorePlaylistLoaded) {
+        console.log("loadAudioData: Firestore playlist nenačten. Pokouším se z LocalStorage.");
+        const savedPlaylist = JSON.parse(localStorage.getItem('currentPlaylist') || '[]');
+        if (savedPlaylist.length > 0) {
+            window.tracks = [...savedPlaylist]; // PŘEPISUJEME PŘÍMO window.tracks
+            checkAndFixTracks(window.tracks); 
+            console.log("loadAudioData: Playlist načten z LocalStorage.");
+        } else {
+            console.log("loadAudioData: Žádný playlist v LocalStorage.");
+        }
+    }
+    if (!firestoreFavoritesLoaded) {
+        console.log("loadAudioData: Firestore oblíbené nenačteny. Pokouším se z LocalStorage.");
+        favorites = JSON.parse(localStorage.getItem('favorites') || '[]');
+        console.log("loadAudioData: Oblíbené načteny z LocalStorage.");
+    }
+    if (!firestorePlayerSettingsLoaded) {
+        console.log("loadAudioData: Firestore nastavení přehrávače nenačteno. Pokouším se z LocalStorage.");
+        const savedPlayerSettings = JSON.parse(localStorage.getItem('playerSettings') || '{}');
+        if (savedPlayerSettings.isShuffled !== undefined) isShuffled = savedPlayerSettings.isShuffled;
+        if (savedPlayerSettings.loop !== undefined && audioPlayer) audioPlayer.loop = savedPlayerSettings.loop;
+        if (savedPlayerSettings.currentTrackIndex !== undefined) currentTrackIndex = savedPlayerSettings.currentTrackIndex;
+        if (savedPlayerSettings.volume !== undefined && audioPlayer) audioPlayer.volume = savedPlayerSettings.volume;
+        if (savedPlayerSettings.muted !== undefined && audioPlayer) audioPlayer.muted = savedPlayerSettings.muted;
+        console.log("loadAudioData: Nastavení přehrávače načteno z LocalStorage.");
+    }
+    
+    // Na konci načítání, pokud se z Firebase nic nenačetlo, a LocalStorage něco má, ULOŽÍME to do Firebase
+    // aby se data z LocalStorage dostala do cloudu. (Pokud se nejedná o původní window.tracks)
+    // Zde kontrolujeme, zda window.tracks (nyní dynamické) má obsah odlišný od původního hardcoded definice
+    // a zda se nepodařilo načíst z Firestore.
+    // Abychom porovnali s původní hardcoded referencí, musíme ji uložit dříve.
+    const initialHardcodedTracksRef = window.tracks; // Uložíme referenci na původní hardcoded pole
+    if ((!firestorePlaylistLoaded && window.tracks.length > 0 && window.tracks !== initialHardcodedTracksRef) || // Pokud Firebase nebylo načteno, ale LS ano a playlist se liší od window.tracks
+        (!firestoreFavoritesLoaded && favorites.length > 0) || // Pokud Firebase nebylo načteno, ale LS ano
+        (!firestorePlayerSettingsLoaded && Object.keys(JSON.parse(localStorage.getItem('playerSettings') || '{}')).length > 0) // Pokud Firebase nebylo načteno, ale LS ano
+       ) {
+        console.log("loadAudioData: Zjištěna chybějící data ve Firestore (ale dostupná lokálně). Ukládám lokální data do cloudu.");
+        await saveAudioData(); // Uloží všechna aktuální data (z LocalStorage) do Firestore
+    }
+
+    // Důležité: Nyní originalTracks a currentPlaylist odkazují na dynamicky načtené window.tracks
+    originalTracks = window.tracks; 
+    currentPlaylist = [...originalTracks]; // currentPlaylist by měl být vždy kopie pro shuffle
+
+    console.log("loadAudioData: Načítání dat pro audio přehrávač dokončeno. Aktuální playlist délka:", currentPlaylist.length, "Oblíbené:", favorites.length);
+}
+
+// Tato funkce ukládá VŠECHNA data (playlist, oblíbené, nastavení přehrávače)
+// do LocalStorage a Firebase Firestore
+async function saveAudioData() {
+    console.log("saveAudioData: Spuštěno ukládání všech dat audio přehrávače do LocalStorage a Firebase.");
+
+    // Ukládání do LocalStorage (pro okamžitou dostupnost a fallback)
+    localStorage.setItem('currentPlaylist', JSON.stringify(window.tracks)); // Uloží window.tracks
+    localStorage.setItem('favorites', JSON.stringify(favorites)); // Uloží oblíbené
+    localStorage.setItem('playerSettings', JSON.stringify({ // Uloží nastavení přehrávače
+        currentTrackIndex: currentTrackIndex,
+        isShuffled: isShuffled,
+        loop: audioPlayer ? audioPlayer.loop : false,
+        volume: audioPlayer ? audioPlayer.volume : 0.5, 
+        muted: audioPlayer ? audioPlayer.muted : false 
+    }));
+    console.log("saveAudioData: Data audio přehrávače úspěšně uložena do LocalStorage.");
+
+    // Ukládání do Firebase Firestore
+    try {
+        console.log("saveAudioData: Pokouším se uložit playlist do Firebase Firestore.");
+        await window.savePlaylistToFirestore(window.tracks); // Uloží window.tracks
+        console.log("saveAudioData: Playlist úspěšně uložen do Firebase Firestore.");
+
+        console.log("saveAudioData: Pokouším se uložit oblíbené do Firebase Firestore.");
+        await window.saveFavoritesToFirestore(favorites);
+        console.log("saveAudioData: Oblíbené úspěšně uloženy do Firebase Firestore.");
+
+        console.log("saveAudioData: Pokouším se uložit nastavení přehrávače do Firebase Firestore.");
+        await window.savePlayerSettingsToFirestore({
+            currentTrackIndex: currentTrackIndex,
+            isShuffled: isShuffled,
+            loop: audioPlayer ? audioPlayer.loop : false,
+            volume: audioPlayer ? audioPlayer.volume : 0.5,
+            muted: audioPlayer ? audioPlayer.muted : false
+        });
+        console.log("saveAudioData: Nastavení přehrávače úspěšně uložena do Firebase Firestore.");
+
+    } catch (error) {
+        console.error("saveAudioData: Nepodařilo se uložit data do Firebase Firestore:", error);
+        window.showNotification("Chyba: Data přehrávače se nepodařilo uložit do cloudu!", 'error');
+    }
+    console.log("saveAudioData: Ukládání dat audio přehrávače dokončeno pro všechny cíle.");
+}
+
+// Funkce pro smazání všech dat přehrávače (pro tlačítko v aplikaci)
+window.clearAllAudioPlayerData = async function() {
+    console.log("clearAllAudioPlayerData: Spuštěn proces mazání VŠECH dat audio přehrávače.");
+    if (confirm('⚠️ OPRAVDU chcete smazat VŠECHNA data audio přehrávače? Tato akce nelze vrátit zpět!')) {
+        if (confirm('⚠️ JSTE SI ABSOLUTNĚ JISTI? Všechna data audio přehrávače budou nenávratně ztracena!')) {
+            localStorage.removeItem('currentPlaylist');
+            localStorage.removeItem('favorites');
+            localStorage.removeItem('playerSettings');
+            console.log("clearAllAudioPlayerData: Lokální data audio přehrávače smazána.");
+            
+            try {
+                console.log("clearAllAudioPlayerData: Pokouším se smazat všechna data audio přehrávače z Firebase Firestore.");
+                // Voláme funkci z audioFirebaseFunctions.js pro mazání všech audio dat z Firestore
+                await window.clearAllAudioFirestoreData(); 
+                console.log("clearAllAudioPlayerData: Všechna data audio přehrávače úspěšně smazána z Firebase Firestore.");
+            } catch (error) {
+                console.error("clearAllAudioPlayerData: Chyba při mazání všech dat audio přehrávače z Firebase Firestore:", error);
+                window.showNotification("Chyba při mazání dat přehrávače z cloudu! Smažte je prosím ručně v konzoli Firebase.", 'error');
+            }
+
+            // Reset globálních proměnných na výchozí hodnoty
+            currentTrackIndex = 0;
+            isShuffled = false;
+            shuffledIndices = [];
+            favorites = [];
+            // Důležité: Resetujeme na původní window.tracks, který je hardcoded v HTML
+            originalTracks = [...window.tracks]; 
+            currentPlaylist = [...originalTracks];
+
+            console.log("clearAllAudioPlayerData: Globální proměnné audio přehrávače resetovány.");
+            // Nyní znova načteme data (použije se původní window.tracks) a aktualizujeme UI
+            populatePlaylist(currentPlaylist);
+            updateVolumeDisplayAndIcon();
+            updateButtonActiveStates(false);
+            if (currentPlaylist.length > 0 && audioPlayer && audioSource && trackTitleElement) {
+                audioSource.src = currentPlaylist[currentTrackIndex].src;
+                trackTitleElement.textContent = currentPlaylist[currentTrackIndex].title;
+                audioPlayer.load();
+            } else if (trackTitleElement) {
+                trackTitleElement.textContent = "Playlist je prázdný";
+            }
+            updateActiveTrackVisuals();
+
+            window.showNotification('Všechna data audio přehrávače byla smazána!', 3000);
+            console.log("clearAllAudioPlayerData: Proces mazání všech dat audio přehrávače dokončen.");
+        } else {
+            console.log("clearAllAudioPlayerData: Mazání všech dat audio přehrávače zrušeno uživatelem (2. fáze).");
+        }
+    } else {
+        console.log("clearAllAudioPlayerData: Mazání všech dat audio přehrávače zrušeno uživatelem (1. fáze).");
+    }
+};
+
+
+// --- Ostatní pomocné funkce (zůstávají v hlavním skriptu, minimalizovány) ---
 
 function updateClock() {
     const now = new Date();
@@ -487,7 +756,7 @@ function updateClock() {
     const options = { year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'long' };
     if (currentDateElement) currentDateElement.textContent = now.toLocaleDateString('cs-CZ', options);
 }
-setInterval(updateClock, 1000);
+setInterval(updateClock, 1000); // Spustí se hned
 updateClock();
 
 
@@ -496,7 +765,7 @@ function logarithmicVolume(value) {
 }
 
 function updateVolumeDisplayAndIcon() {
-    if (!audioPlayer || !volumeSlider || !muteButton || !volumeValueElement) return; // Ochrana proti null
+    if (!audioPlayer || !volumeSlider || !muteButton || !volumeValueElement) return; 
     const volume = audioPlayer.volume;
     const sliderValue = parseFloat(volumeSlider.value); 
 
@@ -508,6 +777,7 @@ function updateVolumeDisplayAndIcon() {
         if (sliderValue <= 0.01) muteButton.textContent = '🔇'; 
         else if (sliderValue <= 0.2) muteButton.textContent = '🔈';
         else if (sliderValue <= 0.5) muteButton.textContent = '🔉'; 
+        else if (sliderValue <= 0.8) muteButton.textContent = '🔊'; 
         else muteButton.textContent = '🔊'; 
     }
 }
@@ -547,16 +817,27 @@ function updateTrackTimeDisplay() {
 }
 
 function populatePlaylist(listToDisplay) {
-    if (!playlistElement) return;
+    console.log("populatePlaylist: Naplňuji playlist vizuálně.");
+    if (!playlistElement) {
+        console.warn("populatePlaylist: Element playlistu nenalezen.");
+        return;
+    }
     playlistElement.innerHTML = ''; 
-    listToDisplay.forEach((track, indexInListToDisplay) => { // index je relativní k listToDisplay
+    if (!listToDisplay || listToDisplay.length === 0) {
+        playlistElement.innerHTML = '<div class="playlist-item" style="justify-content: center; cursor: default;">Žádné skladby v playlistu</div>';
+        console.log("populatePlaylist: Playlist je prázdný, zobrazeno výchozí zpráva.");
+        return;
+    }
+
+    listToDisplay.forEach((track, indexInListToDisplay) => { 
         const item = document.createElement('div');
         item.className = 'playlist-item';
+        item.dataset.originalSrc = track.src; // Používáme dataset pro spolehlivější identifikaci skladby
         
         // Najdeme originální index skladby pro správné přehrávání a porovnání
-        const originalIndex = originalTracks.findIndex(ot => ot.title === track.title && ot.src === track.src);
+        const originalIndex = window.tracks.findIndex(ot => ot.title === track.title && ot.src === track.src); // Používáme window.tracks pro hledání indexu
 
-        if (originalIndex === currentTrackIndex && !audioPlayer.paused) { 
+        if (originalIndex === currentTrackIndex && audioPlayer && !audioPlayer.paused) { 
             item.classList.add('active');
         }
         
@@ -568,172 +849,200 @@ function populatePlaylist(listToDisplay) {
         favButton.className = 'favorite-button';
         favButton.title = 'Přidat/Odebrat z oblíbených';
         favButton.textContent = favorites.includes(track.title) ? '⭐' : '☆';
-        favButton.onclick = (e) => {
+        favButton.onclick = async (e) => { 
             e.stopPropagation();
-            toggleFavorite(track.title); 
+            console.log(`populatePlaylist: Favorite button clicked for "${track.title}".`);
+            await toggleFavorite(track.title); 
         };
         item.appendChild(favButton);
 
         item.addEventListener('click', () => {
+            console.log(`populatePlaylist: Playlist item clicked for "${track.title}".`);
             if (originalIndex !== -1) {
-                 playTrack(originalIndex); 
+                playTrack(originalIndex); 
             } else {
-                console.warn("Skladba nebyla nalezena v originálním seznamu:", track.title);
+                console.warn("populatePlaylist: Skladba nebyla nalezena v originálním seznamu:", track.title);
             }
         });
         playlistElement.appendChild(item);
     });
+    console.log("populatePlaylist: Playlist vizuálně naplněn.");
     updateActiveTrackVisuals();
 }
 
 
 function playTrack(originalIndex) {
-    if (originalIndex < 0 || originalIndex >= originalTracks.length) {
-        console.error("Neplatný index skladby:", originalIndex);
+    console.log(`playTrack: Pokus o přehrání skladby s originálním indexem: ${originalIndex}`);
+    if (originalIndex < 0 || originalIndex >= window.tracks.length) { // Používáme window.tracks pro délku playlistu
+        console.error("playTrack: Neplatný index skladby:", originalIndex);
         return;
     }
     currentTrackIndex = originalIndex; 
-    const track = originalTracks[currentTrackIndex];
+    const track = window.tracks[currentTrackIndex]; // Používáme window.tracks pro získání skladby
 
-    if (!audioSource || !trackTitleElement || !audioPlayer) return;
+    if (!audioSource || !trackTitleElement || !audioPlayer) {
+        console.error("playTrack: Chybí HTML elementy přehrávače.");
+        return;
+    }
 
     audioSource.src = track.src;
     trackTitleElement.textContent = track.title;
     audioPlayer.load();
-    audioPlayer.play().then(() => {
-        console.log("Přehrávání:", track.title);
+    audioPlayer.play().then(async () => { 
+        console.log("playTrack: Přehrávání:", track.title);
         updateButtonActiveStates(true);
         updateActiveTrackVisuals();
+        await saveAudioData(); // Uloží aktuální index a stav přehrávače
     }).catch(error => {
-        //console.error('Chyba při přehrávání:', error);
-        //trackTitleElement.textContent = 'Chyba - nelze přehrát';
+        console.error('playTrack: Chyba při přehrávání:', error);
         updateButtonActiveStates(false);
     });
 }
 
 function updateActiveTrackVisuals() {
+    console.log("updateActiveTrackVisuals: Aktualizuji vizuální zvýraznění aktivní skladby.");
     if (!playlistElement) return;
     const items = playlistElement.getElementsByClassName('playlist-item');
-    const currentTrackToHighlight = originalTracks[currentTrackIndex];
+    const currentTrackData = window.tracks[currentTrackIndex]; // Používáme window.tracks
 
     Array.from(items).forEach(item => {
-        const itemTitleElement = item.querySelector('span');
-        if (itemTitleElement && currentTrackToHighlight) {
-            const itemTitleText = itemTitleElement.textContent;
-            if (itemTitleText === currentTrackToHighlight.title) {
-                item.classList.add('active');
-                if (playlistElement.style.display !== 'none' && playlistElement.offsetParent !== null) {
-                   setTimeout(() => item.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' }), 100);
-                }
-            } else {
-                item.classList.remove('active');
+        // Používáme dataset pro spolehlivější porovnání
+        if (item.dataset.originalSrc && currentTrackData && item.dataset.originalSrc === currentTrackData.src) { 
+            item.classList.add('active');
+            if (playlistElement.style.display !== 'none' && playlistElement.offsetParent !== null) {
+               setTimeout(() => item.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' }), 100);
             }
         } else {
             item.classList.remove('active');
         }
     });
+    console.log("updateActiveTrackVisuals: Vizuální zvýraznění aktualizováno.");
 }
 
 
 function playNextTrack() {
+    console.log("playNextTrack: Přehrávám další skladbu.");
     let nextIndex;
     if (isShuffled) {
         if (shuffledIndices.length === 0) generateShuffledIndices();
         nextIndex = shuffledIndices.pop(); 
         if (typeof nextIndex === 'undefined') { 
-             generateShuffledIndices();
-             nextIndex = shuffledIndices.pop();
+            generateShuffledIndices();
+            nextIndex = shuffledIndices.pop();
         }
     } else {
-        nextIndex = (currentTrackIndex + 1) % originalTracks.length;
+        nextIndex = (currentTrackIndex + 1) % window.tracks.length; // Používáme window.tracks pro délku
     }
     playTrack(nextIndex);
 }
 
 function playPrevTrack() {
+    console.log("playPrevTrack: Přehrávám předchozí skladbu.");
     let prevIndex;
     if (isShuffled) { 
         if (shuffledIndices.length === 0) generateShuffledIndices();
         prevIndex = shuffledIndices.pop();
-         if (typeof prevIndex === 'undefined') {
-             generateShuffledIndices();
-             prevIndex = shuffledIndices.pop();
+        if (typeof prevIndex === 'undefined') {
+            generateShuffledIndices();
+            prevIndex = shuffledIndices.pop();
         }
     } else {
-        prevIndex = (currentTrackIndex - 1 + originalTracks.length) % originalTracks.length;
+        prevIndex = (currentTrackIndex - 1 + window.tracks.length) % window.tracks.length; // Používáme window.tracks pro délku
     }
     playTrack(prevIndex);
 }
 
 function generateShuffledIndices() {
-    shuffledIndices = Array.from({ length: originalTracks.length }, (_, i) => i)
-                          .filter(i => i !== currentTrackIndex); 
+    shuffledIndices = Array.from({ length: window.tracks.length }, (_, i) => i) // Používáme window.tracks pro délku
+                            .filter(i => i !== currentTrackIndex); 
     for (let i = shuffledIndices.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [shuffledIndices[i], shuffledIndices[j]] = [shuffledIndices[j], shuffledIndices[i]];
     }
-    console.log("Nové náhodné pořadí:", shuffledIndices);
+    console.log("generateShuffledIndices: Nové náhodné pořadí generováno:", shuffledIndices);
 }
 
 function updateButtonActiveStates(isPlaying) {
+    console.log(`updateButtonActiveStates: Aktualizuji stav tlačítek přehrávání (isPlaying: ${isPlaying}).`);
     if (playButton) playButton.classList.toggle('active', isPlaying);
     if (pauseButton) pauseButton.classList.toggle('active', !isPlaying);
 }
 
-function toggleFavorite(trackTitle) {
+window.toggleFavorite = async function(trackTitle) { 
+    console.log(`toggleFavorite: Přepínám oblíbenost pro: ${trackTitle}`);
     const indexInFavorites = favorites.indexOf(trackTitle);
     if (indexInFavorites === -1) {
         favorites.push(trackTitle);
+        console.log(`toggleFavorite: Skladba "${trackTitle}" přidána do oblíbených.`);
     } else {
         favorites.splice(indexInFavorites, 1);
+        console.log(`toggleFavorite: Skladba "${trackTitle}" odebrána z oblíbených.`);
     }
-    localStorage.setItem('favorites', JSON.stringify(favorites));
+    await saveAudioData(); 
+    
     populatePlaylist(currentPlaylist); 
     updateFavoritesMenu(); 
-}
+    console.log("toggleFavorite: Oblíbené aktualizovány a uloženy.");
+};
 
-// --- Event Listenery ---
-// Přidáme null checky pro všechny elementy před přidáním listeneru
+// --- Event Listeners ---
 if (playButton) playButton.addEventListener('click', () => {
+    console.log("Play button clicked.");
     if (audioPlayer && audioPlayer.src && audioPlayer.src !== window.location.href) { 
         audioPlayer.play().then(() => updateButtonActiveStates(true)).catch(e => console.error("Play error:", e));
-    } else if (originalTracks.length > 0) {
+    } else if (window.tracks.length > 0) { // Používáme window.tracks pro kontrolu délky
         playTrack(currentTrackIndex); 
     }
 });
 if (pauseButton) pauseButton.addEventListener('click', () => {
+    console.log("Pause button clicked.");
     if (audioPlayer) audioPlayer.pause();
     updateButtonActiveStates(false);
 });
-if (prevButton) prevButton.addEventListener('click', playPrevTrack);
-if (nextButton) nextButton.addEventListener('click', playNextTrack);
+if (prevButton) prevButton.addEventListener('click', () => {
+    console.log("Previous button clicked.");
+    playPrevTrack();
+});
+if (nextButton) nextButton.addEventListener('click', () => {
+    console.log("Next button clicked.");
+    playNextTrack();
+});
 
-if (loopButton) loopButton.addEventListener('click', () => {
+if (loopButton) loopButton.addEventListener('click', async () => { 
+    console.log("Loop button clicked.");
     if (audioPlayer) audioPlayer.loop = !audioPlayer.loop;
     loopButton.classList.toggle('active', audioPlayer.loop);
     loopButton.title = audioPlayer.loop ? "Opakování zapnuto" : "Opakování vypnuto";
+    await saveAudioData(); 
+    console.log("Loop state saved:", audioPlayer.loop);
 });
 
-if (shuffleButton) shuffleButton.addEventListener('click', () => {
+if (shuffleButton) shuffleButton.addEventListener('click', async () => { 
+    console.log("Shuffle button clicked.");
     isShuffled = !isShuffled;
     shuffleButton.classList.toggle('active', isShuffled);
     shuffleButton.title = isShuffled ? "Náhodné přehrávání zapnuto" : "Náhodné přehrávání vypnuto";
     if (isShuffled) {
         generateShuffledIndices();
     }
+    await saveAudioData(); 
+    console.log("Shuffle state saved:", isShuffled);
 });
 
-if (resetButton) resetButton.addEventListener('click', () => { 
+if (resetButton) resetButton.addEventListener('click', async () => { 
+    console.log("Reset button clicked.");
     if (audioPlayer) {
         audioPlayer.currentTime = 0;
         if (!audioPlayer.paused) {
           audioPlayer.play().catch(e => console.error("Play error on reset:", e));
         }
     }
+    await saveAudioData(); 
 });
 
 
 if (fullscreenToggleButton) fullscreenToggleButton.addEventListener('click', () => {
+    console.log("Fullscreen toggle button clicked.");
     if (!document.fullscreenElement) {
         document.documentElement.requestFullscreen().catch(err => console.error("Fullscreen error:", err));
     } else {
@@ -741,39 +1050,50 @@ if (fullscreenToggleButton) fullscreenToggleButton.addEventListener('click', () 
     }
 });
 document.addEventListener('fullscreenchange', () => {
+    console.log("Fullscreen state changed.");
     if (fullscreenToggleButton) {
         fullscreenToggleButton.classList.toggle('active', !!document.fullscreenElement);
         fullscreenToggleButton.title = document.fullscreenElement ? "Ukončit celou obrazovku (F)" : "Celá obrazovka (F)";
     }
+    adjustPlaylistHeight(!!document.fullscreenElement); 
 });
 
 if (toggleInfoButton && popiskyElement) toggleInfoButton.addEventListener('click', () => {
+    console.log("Toggle info button clicked.");
     popiskyElement.style.display = (popiskyElement.style.display === 'none' || popiskyElement.style.display === '') ? 'block' : 'none';
 });
-if (reloadButton) reloadButton.addEventListener('click', () => window.location.reload());
+if (reloadButton) reloadButton.addEventListener('click', () => {
+    console.log("Reload button clicked. Reloading page.");
+    window.location.reload();
+});
 
 let playlistVisible = true; 
 if (togglePlaylistButton && playlistElement) togglePlaylistButton.addEventListener('click', () => {
+    console.log("Toggle playlist button clicked.");
     playlistVisible = !playlistVisible;
     playlistElement.style.display = playlistVisible ? 'block' : 'none';
     togglePlaylistButton.classList.toggle('active', playlistVisible);
     togglePlaylistButton.title = playlistVisible ? "Skrýt playlist" : "Zobrazit playlist";
-     if (playlistVisible) {
+    if (playlistVisible) {
         updateActiveTrackVisuals(); 
     }
 });
 
 if (progressBar && audioPlayer) progressBar.addEventListener('input', () => {
+    // console.log("Progress bar changed."); 
     if (audioPlayer.duration) {
         audioPlayer.currentTime = audioPlayer.duration * (progressBar.value / 100);
     }
 });
 
-if (volumeSlider && audioPlayer) volumeSlider.addEventListener('input', (e) => {
+if (volumeSlider && audioPlayer) volumeSlider.addEventListener('input', async (e) => { 
+    // console.log("Volume slider changed."); 
     audioPlayer.volume = logarithmicVolume(e.target.value);
     updateVolumeDisplayAndIcon();
+    await saveAudioData(); 
 });
-if (muteButton && audioPlayer && volumeSlider) muteButton.addEventListener('click', () => {
+if (muteButton && audioPlayer && volumeSlider) muteButton.addEventListener('click', async () => { 
+    console.log("Mute button clicked.");
     audioPlayer.muted = !audioPlayer.muted; 
     if (audioPlayer.muted) {
         muteButton.dataset.previousVolume = volumeSlider.value; 
@@ -784,23 +1104,29 @@ if (muteButton && audioPlayer && volumeSlider) muteButton.addEventListener('clic
         audioPlayer.volume = logarithmicVolume(prevSliderVol);
     }
     updateVolumeDisplayAndIcon();
+    await saveAudioData(); 
 });
 
 if (audioPlayer) {
     audioPlayer.addEventListener('volumechange', updateVolumeDisplayAndIcon);
     audioPlayer.addEventListener('timeupdate', updateTrackTimeDisplay);
     audioPlayer.addEventListener('loadedmetadata', updateTrackTimeDisplay);
-    audioPlayer.addEventListener('ended', () => {
+    audioPlayer.addEventListener('ended', async () => { 
+        console.log("Audio ended. Playing next track if not looping.");
         updateButtonActiveStates(false);
-        if (!audioPlayer.loop) playNextTrack();
+        if (!audioPlayer.loop) playNextTrack(); 
+        await saveAudioData(); 
+        console.log("Player state saved after track ended.");
     });
     audioPlayer.addEventListener('play', () => updateButtonActiveStates(true));
     audioPlayer.addEventListener('pause', () => updateButtonActiveStates(false));
+    audioPlayer.addEventListener('error', (e) => console.error("Audio player error:", e)); 
 }
 
 
-document.addEventListener('keydown', (e) => {
+document.addEventListener('keydown', async (e) => { 
     if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
+    console.log(`Key pressed: ${e.code}`);
     let preventDefault = true;
     switch (e.code) {
         case 'Space': case 'KeyP': if (audioPlayer && audioPlayer.paused) playButton?.click(); else pauseButton?.click(); break;
@@ -808,11 +1134,11 @@ document.addEventListener('keydown', (e) => {
         case 'ArrowRight': nextButton?.click(); break;
         case 'KeyM': muteButton?.click(); break;
         case 'KeyL': loopButton?.click(); break;
-        case 'KeyS': if (audioPlayer) { audioPlayer.pause(); audioPlayer.currentTime = 0; updateButtonActiveStates(false); } break;
+        case 'KeyS': if (audioPlayer) { audioPlayer.pause(); audioPlayer.currentTime = 0; updateButtonActiveStates(false); await saveAudioData(); } break; 
         case 'KeyR': resetButton?.click(); break;
         case 'KeyF': fullscreenToggleButton?.click(); break;
-        case 'KeyA': if (volumeSlider) { volumeSlider.value = Math.max(0, parseFloat(volumeSlider.value) - 0.05); volumeSlider.dispatchEvent(new Event('input'));} break;
-        case 'KeyD': if (volumeSlider) { volumeSlider.value = Math.min(1, parseFloat(volumeSlider.value) + 0.05); volumeSlider.dispatchEvent(new Event('input'));} break;
+        case 'KeyA': if (volumeSlider) { volumeSlider.value = Math.max(0, parseFloat(volumeSlider.value) - 0.05); volumeSlider.dispatchEvent(new Event('input')); await saveAudioData(); } break; 
+        case 'KeyD': if (volumeSlider) { volumeSlider.value = Math.min(1, parseFloat(volumeSlider.value) + 0.05); volumeSlider.dispatchEvent(new Event('input')); await saveAudioData(); } break; 
         case 'KeyB': favoritesButton?.click(); break;
         case 'KeyT': timerButton?.click(); break;
         case 'ArrowUp': if (playlistElement) playlistElement.scrollTop -= 50; break;
@@ -865,10 +1191,12 @@ function setTimerValue(minutes) {
 }
 
 if (timerButton && timerContainer) timerButton.addEventListener('click', () => {
+    console.log("Timer button clicked.");
     timerContainer.style.display = (timerContainer.style.display === 'none' || !timerContainer.style.display) ? 'flex' : 'none';
     timerButton.classList.toggle('active', timerContainer.style.display === 'flex');
 });
 if (timerStartButton) timerStartButton.addEventListener('click', () => {
+    console.log("Timer start button clicked.");
     if (!isTimerRunning && timerValueInSeconds > 0) {
         clearInterval(timerInterval); 
         timerInterval = setInterval(countdown, 1000);
@@ -877,12 +1205,16 @@ if (timerStartButton) timerStartButton.addEventListener('click', () => {
     }
 });
 if (timerStopButton) timerStopButton.addEventListener('click', () => {
+    console.log("Timer stop button clicked.");
     clearInterval(timerInterval);
     isTimerRunning = false;
 });
 Object.entries(timerButtonsPreset).forEach(([id, minutes]) => {
     const btn = document.getElementById(id);
-    if (btn) btn.addEventListener('click', () => setTimerValue(minutes));
+    if (btn) btn.addEventListener('click', () => {
+        console.log(`Timer preset button clicked: ${minutes} minutes.`);
+        setTimerValue(minutes);
+    });
 });
 updateTimerDisplay(); 
 
@@ -896,6 +1228,7 @@ favoritesButton.textContent = '⭐';
 const controlsDiv = document.querySelector('#control-panel .controls');
 if (controlsDiv) {
     controlsDiv.appendChild(favoritesButton); // Přidání tlačítka do DOM
+    console.log("Favorites button added to DOM.");
 } else {
     console.error("Element .controls nebyl nalezen pro přidání tlačítka oblíbených.");
 }
@@ -905,21 +1238,35 @@ const favoritesMenu = document.createElement('div');
 favoritesMenu.className = 'favorites-menu';
 favoritesMenu.innerHTML = '<h3>Oblíbené skladby</h3><div id="favorites-list" class="playlist"></div>'; 
 document.body.appendChild(favoritesMenu); 
+console.log("Favorites menu added to DOM.");
 
 function updateFavoritesMenu() {
+    console.log("updateFavoritesMenu: Aktualizuji menu oblíbených.");
     const favoritesList = favoritesMenu.querySelector('#favorites-list');
-    if (!favoritesList) return;
+    if (!favoritesList) {
+        console.warn("updateFavoritesMenu: Element seznamu oblíbených nenalezen.");
+        return;
+    }
     favoritesList.innerHTML = '';
     if (favorites.length === 0) {
         favoritesList.innerHTML = '<div class="playlist-item" style="justify-content: center; cursor: default;">Žádné oblíbené skladby</div>';
+        console.log("updateFavoritesMenu: Seznam oblíbených je prázdný.");
         return;
     }
     favorites.forEach(title => {
+        // Použijeme originalTracks pro nalezení celé skladby
         const originalTrack = originalTracks.find(t => t.title === title);
-        if (!originalTrack) return; 
+        if (!originalTrack) {
+            console.warn(`updateFavoritesMenu: Skladba "${title}" nenalezena v originálním seznamu, přeskočena.`);
+            return; 
+        }
 
         const item = document.createElement('div');
         item.className = 'playlist-item'; 
+        // Přidáme dataset pro originální src pro spolehlivější identifikaci
+        item.dataset.originalSrc = originalTrack.src;
+
+        // Kontroluje, zda se aktuálně přehrávaná skladba shoduje s touto oblíbenou
         if (currentTrackIndex === originalTracks.indexOf(originalTrack) && audioPlayer && !audioPlayer.paused) {
             item.classList.add('active');
         }
@@ -932,13 +1279,15 @@ function updateFavoritesMenu() {
         removeBtn.className = 'favorite-remove favorite-button'; 
         removeBtn.title = 'Odebrat z oblíbených';
         removeBtn.textContent = '🗑️';
-        removeBtn.onclick = (e) => {
+        removeBtn.onclick = async (e) => { 
             e.stopPropagation();
-            toggleFavorite(title); 
+            console.log(`updateFavoritesMenu: Remove button clicked for "${title}".`);
+            await toggleFavorite(title); 
         };
         item.appendChild(removeBtn);
 
         item.addEventListener('click', () => {
+            console.log(`updateFavoritesMenu: Playlist item clicked for "${title}".`);
             const trackToPlayIndex = originalTracks.indexOf(originalTrack);
             if (trackToPlayIndex !== -1) playTrack(trackToPlayIndex);
             favoritesMenu.style.display = 'none'; 
@@ -946,45 +1295,56 @@ function updateFavoritesMenu() {
         });
         favoritesList.appendChild(item);
     });
+    console.log("updateFavoritesMenu: Menu oblíbených aktualizováno.");
 }
 
-if (favoritesButton) favoritesButton.addEventListener('click', (e) => {
+if (favoritesButton) favoritesButton.addEventListener('click', async (e) => { 
+    console.log("Favorites button clicked.");
     e.stopPropagation(); 
     if (favoritesMenu.style.display === 'none' || !favoritesMenu.style.display) {
-        updateFavoritesMenu();
+        // Před otevřením menu oblíbených ho aktualizujeme
+        await updateFavoritesMenu(); 
         favoritesMenu.style.display = 'block';
         favoritesButton.classList.add('active');
+        console.log("Favorites menu opened.");
     } else {
         favoritesMenu.style.display = 'none';
         favoritesButton.classList.remove('active');
+        console.log("Favorites menu closed.");
     }
 });
 document.addEventListener('click', (e) => {
     if (favoritesMenu && !favoritesMenu.contains(e.target) && e.target !== favoritesButton) {
         favoritesMenu.style.display = 'none';
         if (favoritesButton) favoritesButton.classList.remove('active');
+        console.log("Favorites menu closed by outside click.");
     }
 });
 
 
 // --- Inicializace ---
-document.addEventListener('DOMContentLoaded', () => {
-    if (typeof window.tracks !== 'undefined' && Array.isArray(window.tracks)) {
-        originalTracks = [...window.tracks];
-        currentPlaylist = [...originalTracks]; 
-        checkAndFixTracks(originalTracks);
+document.addEventListener('DOMContentLoaded', async () => { 
+    console.log("DOMContentLoaded: DOM plně načten. Spouštím inicializaci audio přehrávače.");
+
+    // Inicializace Firebase aplikace a Firestore databáze
+    const firebaseInitialized = await window.initializeFirebaseAppAudio(); // Zde je změna: await!
+    if (!firebaseInitialized) {
+        console.error("DOMContentLoaded: Kritická chyba: Nepodařilo se inicializovat Firebase pro audio přehrávač. Data z cloudu nebudou dostupná.");
+        window.showNotification("Kritická chyba: Nelze se připojit k databázi. Data se ukládají pouze lokálně!", 'error');
     } else {
-        console.error("Seznam skladeb (window.tracks) není správně definován!");
-        originalTracks = [];
-        currentPlaylist = [];
+        console.log("DOMContentLoaded: Firebase inicializace dokončena pro audio přehrávač.");
     }
-    
+
+    // Načítání dat přehrávače (playlist, oblíbené, nastavení)
+    await loadAudioData(); // Nyní čekáme na načtení všech dat
+
+    console.log("DOMContentLoaded: Inicializace prvků UI přehrávače.");
     if (playlistElement) populatePlaylist(currentPlaylist); 
     updateVolumeDisplayAndIcon(); 
     updateButtonActiveStates(false); 
 
     if (currentPlaylist.length > 0 && audioPlayer && audioSource && trackTitleElement) {
-        const firstTrack = currentPlaylist[0];
+        const firstTrack = currentPlaylist[currentTrackIndex]; 
         audioSource.src = firstTrack.src;
         trackTitleElement.textContent = firstTrack.title;
         audioPlayer.load(); 
@@ -993,115 +1353,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     updateActiveTrackVisuals(); 
     
-    // Inicializace pro persistentní nastavení výšky playlistu a pozadí
+    // Inicializace pro persistentní nastavení výšky playlistu a pozadí (pokud existují)
     if (typeof restorePreviousSettings === 'function') restorePreviousSettings();
     if (typeof restorePreviousBackground === 'function') restorePreviousBackground();
 
-    // Inicializace pro menu ukládání (pokud je tato funkce definována)
-    if (typeof initStorageSystem === 'function') {
-         setTimeout(initStorageSystem, 500); // Dáme tomu chvilku, aby se DOM plně načetl
-    } else {
-        console.warn("Funkce initStorageSystem není definována.");
-    }
+    // Spuštění hodin
+    setInterval(updateClock, 1000);
+    updateClock();
 
-
+    console.log("DOMContentLoaded: Hlavní inicializace audio přehrávače dokončena.");
 });
-
-// Odstranění duplicitní definice pro fullscreen a initStorageSystem,
-// protože jsou již definovány výše nebo jejich logika byla integrována.
-// Ujistěte se, že všechny funkce jsou definovány před jejich prvním voláním,
-// nebo jsou volány až po DOMContentLoaded.
-
-// Funkce pro persistentní nastavení výšky playlistu a pozadí (ponecháno pro kontext, pokud by se používalo)
-function detectDeviceType() {
-    const screenWidth = window.screen.width;
-    const screenHeight = window.screen.height;
-    const userAgent = navigator.userAgent.toLowerCase();
-    const deviceInfo = {
-        isInfinixNote30: ((screenWidth <= 420 && screenHeight >= 800) && (userAgent.includes('infinix') || userAgent.includes('note30') || userAgent.includes('android'))),
-        isLargeMonitor: screenWidth > 1600,
-        isMobile: screenWidth <= 768,
-        orientation: window.matchMedia("(orientation: landscape)").matches ? 'landscape' : 'portrait'
-    };
-    localStorage.setItem('device_isLargeMonitor', deviceInfo.isLargeMonitor.toString());
-    localStorage.setItem('device_isInfinixNote30', deviceInfo.isInfinixNote30.toString());
-    localStorage.setItem('device_isMobile', deviceInfo.isMobile.toString());
-    localStorage.setItem('device_orientation', deviceInfo.orientation);
-    return deviceInfo;
-}
-
-function adjustPlaylistHeight(isFullscreen = false) {
-    const playlist = document.querySelector('#playlist');
-    if (!playlist) return;
-    const deviceInfo = detectDeviceType();
-    localStorage.setItem('playlist_isFullscreen', isFullscreen.toString());
-    let newHeight = '245px'; 
-    if (deviceInfo.isInfinixNote30) {
-        newHeight = deviceInfo.orientation === 'landscape' ? '240px' : '240px';
-    } else if (isFullscreen) {
-        newHeight = deviceInfo.isLargeMonitor ? '427px' : '360px';
-    } else {
-        newHeight = deviceInfo.isLargeMonitor ? '360px' : '245px';
-    }
-    playlist.style.maxHeight = newHeight;
-    localStorage.setItem('playlist_lastHeight', newHeight);
-}
-
-function restorePreviousSettings() {
-    const playlist = document.querySelector('#playlist');
-    if (!playlist) return;
-    const lastHeight = localStorage.getItem('playlist_lastHeight');
-    if (lastHeight) {
-        playlist.style.maxHeight = lastHeight;
-    } else {
-        adjustPlaylistHeight(localStorage.getItem('playlist_isFullscreen') === 'true');
-    }
-}
-
-function setBackgroundForDevice() {
-    const deviceInfo = detectDeviceType();
-    const backgrounds = {
-        desktop: 'https://img41.rajce.idnes.cz/d4102/19/19244/19244630_db82ad174937335b1a151341387b7af2/images/vnon-pozadi-od-admirala-chatbota..jpg?ver=1',
-        infinix: 'https://img41.rajce.idnes.cz/d4103/19/19345/19345400_697de249bbe74592fe530fb6166058da/images/image_1024x1792.jpg?ver=0'
-    };
-    let backgroundUrl = deviceInfo.isInfinixNote30 ? backgrounds.infinix : backgrounds.desktop;
-    const bgContainer = document.querySelector('.background-image-container img');
-    if (bgContainer) bgContainer.src = backgroundUrl; // Měníme src obrázku místo body background
-    localStorage.setItem('background_url', backgroundUrl);
-}
-
-function restorePreviousBackground() {
-    const savedBackgroundUrl = localStorage.getItem('background_url');
-    const bgContainerImg = document.querySelector('.background-image-container img');
-    if (!bgContainerImg) return;
-
-    if (savedBackgroundUrl) {
-        bgContainerImg.src = savedBackgroundUrl;
-    } else {
-        setBackgroundForDevice();
-    }
-}
-
-window.addEventListener('orientationchange', () => setTimeout(() => {
-    adjustPlaylistHeight(!!document.fullscreenElement);
-    setBackgroundForDevice();
-}, 300));
-
-window.addEventListener('resize', () => {
-    if (window.resizeTimer) clearTimeout(window.resizeTimer);
-    window.resizeTimer = setTimeout(() => {
-        adjustPlaylistHeight(!!document.fullscreenElement);
-        setBackgroundForDevice();
-    }, 250);
-});
-
-// Funkce initStorageSystem a její pomocné funkce pro ukládání/načítání playlistu
-// Tato část byla v původním kódu, ale zdá se, že není plně využívána nebo je nekompletní.
-// Pro jednoduchost a zaměření na hlavní funkcionalitu přehrávače ji zde nebudu plně reimplementovat,
-// ale ponechávám placeholder, pokud byste ji chtěl později rozšířit.
-function initStorageSystem() {
-    console.log("Systém ukládání (localStorage) pro playlist by byl inicializován zde.");
-    // Zde by byla logika pro createUnifiedMenu, saveTracks, loadTracks atd.
-    // Prozatím tato funkce nic nedělá, aby se předešlo chybám z nekompletní implementace.
-}
-// Konec placeholderu pro initStorageSystem
